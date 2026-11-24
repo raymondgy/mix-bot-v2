@@ -1,6 +1,6 @@
-name: Run Betting Bot
+name: Over 1.5 Bot
 
-  on:
+on:
   schedule:
     - cron: '0 7 * * *'
   workflow_dispatch:
@@ -8,13 +8,20 @@ name: Run Betting Bot
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - name: Run python main.py
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run bot
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
