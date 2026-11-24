@@ -18,7 +18,7 @@ def get_best_5(picks):
     return picks[:5]
 
 def get_odds_for_sport(sport_key, league_name):
-    url = f"https://api.oddsapi.io/v4/sports/{sport_key}/odds"
+    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
     params = {
         "apiKey": ODDS_API_KEY,
         "regions": "eu",
