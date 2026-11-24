@@ -6,12 +6,12 @@ ODDS_API_KEY = os.getenv("ODDS_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-def get_odds_for_sport(sport_key):
+def get_over15_for_sport(sport_key):
     url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
     params = {
         "apiKey": ODDS_API_KEY,
-        "regions": "us",
-        "markets": "h2h",
+        "regions": "us,uk,eu",
+        "markets": "totals",
         "oddsFormat": "decimal",
     }
     try:
@@ -46,14 +46,17 @@ def get_odds_for_sport(sport_key):
 
         for bm in bookmakers:
             for market in bm.get("markets", []):
+                if market.get("key") != "totals":
+                    continue
                 for outcome in market.get("outcomes", []):
                     price = outcome.get("price")
                     name = outcome.get("name")
-                    # Only safe favourites: 1.30 - 1.55
-                    if price and 1.30 <= price <= 1.55:
+                    point = outcome.get("point")
+                    # Only Over 1.5, safe range
+                    if name == "Over" and point == 1.5 and price and 1.15 <= price <= 1.40:
                         picks.append({
                             "match": f"{home} vs {away}",
-                            "pick": name,
+                            "pick": "Over 1.5 Goals",
                             "odd": price,
                             "time": time_str
                         })
@@ -63,13 +66,12 @@ def get_odds_for_sport(sport_key):
 def build_slip(picks, title, emoji):
     if not picks:
         return None
-    # Pick 5 selections that multiply to ~5.00
+    # Pick 4 selections - total go be around 2.0 - 2.5
     selected = []
     total = 1.0
     for p in picks:
-        if len(selected) >= 5:
+        if len(selected) >= 4:
             break
-        # Avoid duplicate matches
         if any(s["match"] == p["match"] for s in selected):
             continue
         selected.append(p)
@@ -78,7 +80,7 @@ def build_slip(picks, title, emoji):
     if len(selected) < 3:
         return None
 
-    lines = [f"{emoji} {title} - {len(selected)} ODDS 🎯", ""]
+    lines = [f"{emoji} {title} - Over 1.5 Goals 🎯", ""]
     for p in selected:
         lines.append(f"⏰ {p['time']} | {p['match']}")
         lines.append(f"👉 {p['pick']} @ {p['odd']}")
@@ -99,31 +101,24 @@ def send_telegram(message):
         print("Telegram error:", e)
 
 def main():
-    print("Starting bot...")
+    print("Starting bot - Over 1.5 mode...")
     print("ODDS_API_KEY set:", bool(ODDS_API_KEY))
-    print("TELEGRAM_BOT_TOKEN set:", bool(TELEGRAM_BOT_TOKEN))
-    print("TELEGRAM_CHAT_ID set:", bool(TELEGRAM_CHAT_ID))
 
-    football = get_odds_for_sport("soccer")
-    print(f"Football picks: {len(football)}")
+    # Try several leagues to get enough Over 1.5 games
+    all_picks = []
+    for league in ["soccer_epl", "soccer_spain_la_liga", "soccer_italy_serie_a", "soccer_germany_bundesliga", "soccer_france_ligue_one", "soccer_netherlands_eredivisie", "soccer_portugal_primeira_liga", "soccer"]:
+        picks = get_over15_for_sport(league)
+        print(f"{league} picks: {len(picks)}")
+        all_picks.extend(picks)
 
-    basketball = get_odds_for_sport("basketball_nba")
-    print(f"Basketball picks: {len(basketball)}")
-
-    foot_slip = build_slip(football, "FOOTBALL", "⚽")
-    basket_slip = build_slip(basketball, "BASKETBALL", "🏀")
+    foot_slip = build_slip(all_picks, "FOOTBALL OVER 1.5", "⚽")
 
     if foot_slip:
         print("Sending football slip")
         send_telegram(foot_slip)
     else:
         print("No football picks")
-
-    if basket_slip:
-        print("Sending basketball slip")
-        send_telegram(basket_slip)
-    else:
-        print("No basketball picks")
+        send_telegram("⚽ No Over 1.5 picks today - no good value. Check back tomorrow.")
 
     print("Bot done.")
 
